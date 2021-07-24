@@ -24,16 +24,17 @@ import Data.Monoid ((<>))
 import Text.Heredoc (here)
 
 indexHtml :: ByteString
-indexHtml =
-    "<!DOCTYPE html>\n\
-    \<html>\n\
-    \<head>\n\
-    \<title>JSaddle</title>\n\
-    \</head>\n\
-    \<body>\n\
-    \</body>\n\
-    \<script src=\"/jsaddle.js\"></script>\n\
-    \</html>"
+indexHtml = [here|
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <title>JSaddle</title>
+    </head>
+    <body>
+    </body>
+    <script src="/jsaddle.js"></script>
+    </html>
+|]
 
 initState :: ByteString
 initState = "\
