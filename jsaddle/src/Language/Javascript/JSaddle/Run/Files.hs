@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.Javascript.JSaddle.WebSockets.Files
@@ -20,6 +21,7 @@ module Language.Javascript.JSaddle.Run.Files (
 
 import Data.ByteString.Lazy (ByteString)
 import Data.Monoid ((<>))
+import Text.Heredoc (here)
 
 indexHtml :: ByteString
 indexHtml =
