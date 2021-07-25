@@ -232,7 +232,7 @@ jsaddleJs' jsaddleUri refreshOnLoad = "\
               --     \                       xhr.setRequestHeader(\"Content-type\", \"application/json\");\n\
               --     \                       xhr.send(JSON.stringify(" <> a <> "));\n\
               --     \                       return JSON.parse(xhr.response);})()")) <> "\
-             "\
+             <> "\
     \        };\n\
     \    };\n\
     \    ws0.onerror = function() {\n\
