@@ -275,13 +275,13 @@ ${block6}
 ${block8}
               break;
             } else {
-${block10}
+${setBatch1}
             }
           } else {
             if(syncDepth <= 0) {
               break;
             } else {
-${block12}
+${setBatch2}
             }
           }
         }
@@ -311,24 +311,25 @@ ${block14}
   runBatch(batch);
 |]
   where
-    sendArg :: ByteString
-    sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
     block4 :: ByteString
-    block4 = case sendSync of
-      Just s  -> [i|
+    block4 =
+      let sendArg :: ByteString
+          sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
+      in  case sendSync of
+            Just s  -> [i|
                                         if(inCallback > 0) {
                                           ${send sendArg}
                                         } else {
                                           runBatch(${s sendArg}, 1);
                                         }
 |]
-      Nothing -> send sendArg
+            Nothing -> send sendArg
     block6 :: ByteString
     block6 = send "{\"tag\": \"ProtocolError\", \"contents\": e.data}"
     block8 :: ByteString
     block8 = send "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
-    block10 :: ByteString
-    block10 = case sendSync of
+    setBatch1 :: ByteString
+    setBatch1 = case sendSync of
       Just s  ->
         let sArg :: ByteString
             sArg = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
@@ -345,8 +346,8 @@ ${block14}
               ${send sendArg'}
               break;
 |]
-    block12 :: ByteString
-    block12 = case sendSync of
+    setBatch2 :: ByteString
+    setBatch2 = case sendSync of
       Just s  ->
         let sArg1 :: ByteString
             sArg1 = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
