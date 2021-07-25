@@ -160,11 +160,11 @@ runBatch send sendSync = mconcat
 |]
     block4 = case sendSync of
       Just s  ->
-      "                                        if(inCallback > 0) {\n\
-      \                                          " <> block2 <> "\
-      \                                        } else {\n\
-      \                                          runBatch(" <> s sendArg <> ", 1);\n\
-      \                                        }\n"
+        "                                        if(inCallback > 0) {\n\
+        \                                          " <> block2 <> "\
+        \                                        } else {\n\
+        \                                          runBatch(" <> s sendArg <> ", 1);\n\
+        \                                        }\n"
       Nothing -> block2
     block5 = [here|
                                     };
