@@ -156,7 +156,6 @@ runBatch send sendSync = mconcat
                                             jsaddle_values.set(nArg, arguments[i]);
                                             args[i] = nArg;
                                         }
-                                        if(inCallback > 0) {
 |]
     block4 = case sendSync of
       Just s  ->
@@ -169,7 +168,7 @@ runBatch send sendSync = mconcat
     block5 = [here|
                                     };
                                     jsaddle_values.set(nFunction, func);
-                                })();
+                                    })();
                                 break;
                             case "FreeCallback":
                                 callbacksToFree.push(d.contents);
