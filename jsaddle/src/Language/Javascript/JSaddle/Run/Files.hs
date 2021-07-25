@@ -37,20 +37,20 @@ indexHtml = [here|
 |]
 
 initState :: ByteString
-initState = "\
-    \        var jsaddle_values = new Map();\n\
-    \        var jsaddle_free = new Map();\n\
-    \        jsaddle_values.set(0, null);\n\
-    \        jsaddle_values.set(1, undefined);\n\
-    \        jsaddle_values.set(2, false);\n\
-    \        jsaddle_values.set(3, true);\n\
-    \        jsaddle_values.set(4, globalThis);\n\
-    \        var jsaddle_index = 100;\n\
-    \        var expectedBatch = 1;\n\
-    \        var lastResults = [0, {\"tag\": \"Success\", \"contents\": [[], []]}];\n\
-    \        var inCallback = 0;\n\
-    \        var asyncBatch = null;\n\
-    \"
+initState = [here|
+            var jsaddle_values = new Map();
+            var jsaddle_free = new Map();
+            jsaddle_values.set(0, null);
+            jsaddle_values.set(1, undefined);
+            jsaddle_values.set(2, false);
+            jsaddle_values.set(3, true);
+            jsaddle_values.set(4, globalThis);
+            var jsaddle_index = 100;
+            var expectedBatch = 1;
+            var lastResults = [0, {"tag": "Success", "contents": [[], []]}];
+            var inCallback = 0;
+            var asyncBatch = null;
+|]
 
 runBatch :: (ByteString -> ByteString) -> Maybe (ByteString -> ByteString) -> ByteString
 runBatch send sendSync = "\
@@ -341,125 +341,481 @@ runBatch send sendSync = "\
     \"
 
 ghcjsHelpers :: ByteString
-ghcjsHelpers = "\
-    \function h$isNumber(o) {\
-    \    return typeof(o) === 'number';\n\
-    \}\n\
-    \\n\
-    \// returns true for null, but not for functions and host objects\n\
-    \function h$isObject(o) {\n\
-    \    return typeof(o) === 'object';\n\
-    \}\n\
-    \\n\
-    \function h$isString(o) {\n\
-    \    return typeof(o) === 'string';\n\
-    \}\n\
-    \\n\
-    \function h$isSymbol(o) {\n\
-    \    return typeof(o) === 'symbol';\n\
-    \}\n\
-    \\n\
-    \function h$isBoolean(o) {\n\
-    \    return typeof(o) === 'boolean';\n\
-    \}\n\
-    \\n\
-    \function h$isFunction(o) {\n\
-    \    return typeof(o) === 'function';\n\
-    \}\n\
-    \\n\
-    \function h$jsTypeOf(o) {\n\
-    \    var t = typeof(o);\n\
-    \    if(t === 'undefined') return 0;\n\
-    \    if(t === 'object')    return 1;\n\
-    \    if(t === 'boolean')   return 2;\n\
-    \    if(t === 'number')    return 3;\n\
-    \    if(t === 'string')    return 4;\n\
-    \    if(t === 'symbol')    return 5;\n\
-    \    if(t === 'function')  return 6;\n\
-    \    return 7; // other, host object etc\n\
-    \}\n\
-    \\n\
-    \function h$jsonTypeOf(o) {\n\
-    \    if (!(o instanceof Object)) {\n\
-    \        if (o == null) {\n\
-    \            return 0;\n\
-    \        } else if (typeof o == 'number') {\n\
-    \            if (h$isInteger(o)) {\n\
-    \                return 1;\n\
-    \            } else {\n\
-    \                return 2;\n\
-    \            }\n\
-    \        } else if (typeof o == 'boolean') {\n\
-    \            return 3;\n\
-    \        } else {\n\
-    \            return 4;\n\
-    \        }\n\
-    \    } else {\n\
-    \        if (Object.prototype.toString.call(o) == '[object Array]') {\n\
-    \            // it's an array\n\
-    \            return 5;\n\
-    \        } else if (!o) {\n\
-    \            // null \n\
-    \            return 0;\n\
-    \        } else {\n\
-    \            // it's an object\n\
-    \            return 6;\n\
-    \        }\n\
-    \    }\n\
-    \\n\
-    \}\n\
-    \function h$roundUpToMultipleOf(n,m) {\n\
-    \  var rem = n % m;\n\
-    \  return rem === 0 ? n : n - rem + m;\n\
-    \}\n\
-    \\n\
-    \function h$newByteArray(len) {\n\
-    \  var len0 = Math.max(h$roundUpToMultipleOf(len, 8), 8);\n\
-    \  var buf = new ArrayBuffer(len0);\n\
-    \  return { buf: buf\n\
-    \         , len: len\n\
-    \         , i3: new Int32Array(buf)\n\
-    \         , u8: new Uint8Array(buf)\n\
-    \         , u1: new Uint16Array(buf)\n\
-    \         , f3: new Float32Array(buf)\n\
-    \         , f6: new Float64Array(buf)\n\
-    \         , dv: new DataView(buf)\n\
-    \         }\n\
-    \}\n\
-    \function h$wrapBuffer(buf, unalignedOk, offset, length) {\n\
-    \  if(!unalignedOk && offset && offset % 8 !== 0) {\n\
-    \    throw (\"h$wrapBuffer: offset not aligned:\" + offset);\n\
-    \  }\n\
-    \  if(!buf || !(buf instanceof ArrayBuffer))\n\
-    \    throw \"h$wrapBuffer: not an ArrayBuffer\"\n\
-    \  if(!offset) { offset = 0; }\n\
-    \  if(!length || length < 0) { length = buf.byteLength - offset; }\n\
-    \  return { buf: buf\n\
-    \         , len: length\n\
-    \         , i3: (offset%4) ? null : new Int32Array(buf, offset, length >> 2)\n\
-    \         , u8: new Uint8Array(buf, offset, length)\n\
-    \         , u1: (offset%2) ? null : new Uint16Array(buf, offset, length >> 1)\n\
-    \         , f3: (offset%4) ? null : new Float32Array(buf, offset, length >> 2)\n\
-    \         , f6: (offset%8) ? null : new Float64Array(buf, offset, length >> 3)\n\
-    \         , dv: new DataView(buf, offset, length)\n\
-    \         };\n\
-    \}\n\
-    \function h$newByteArrayFromBase64String(base64) {\n\
-    \  var bin = window.atob(base64);\n\
-    \  var ba = h$newByteArray(bin.length);\n\
-    \  var u8 = ba.u8;\n\
-    \  for (var i = 0; i < bin.length; i++) {\n\
-    \    u8[i] = bin.charCodeAt(i);\n\
-    \  }\n\
-    \  return ba;\n\
-    \}\n\
-    \function h$byteArrayToBase64String(off, len, ba) {\n\
-    \  var bin = '';\n\
-    \  var u8 = ba.u8;\n\
-    \  var end = off + len;\n\
-    \  for (var i = off; i < end; i++) {\n\
-    \    bin += String.fromCharCode(u8[i]);\n\
-    \  }\n\
-    \  return window.btoa(bin);\n\
-    \}\n\
-    \"
+ghcjsHelpers = [|here
+function h$isNumber(o) {    return typeof(o) === 'number';
+}
+
+// returns true for null, but not for functions and host objects
+function h$isObject(o) {
+    return typeof(o) === 'object';
+}
+
+function h$isString(o) {
+    return typeof(o) === 'string';
+}
+
+function h$isSymbol(o) {
+    return typeof(o) === 'symbol';
+}
+
+function h$isBoolean(o) {
+    return typeof(o) === 'boolean';
+}
+
+function h$isFunction(o) {
+    return typeof(o) === 'function';
+}
+
+function h$jsTypeOf(o) {
+    var t = typeof(o);
+    if(t === 'undefined') return 0;
+    if(t === 'object')    return 1;
+    if(t === 'boolean')   return 2;
+    if(t === 'number')    return 3;
+    if(t === 'string')    return 4;
+    if(t === 'symbol')    return 5;
+    if(t === 'function')  return 6;
+    return 7; // other, host object etc
+}
+
+function h$jsonTypeOf(o) {
+    if (!(o instanceof Object)) {
+        if (o == null) {
+            return 0;
+        } else if (typeof o == 'number') {
+            if (h$isInteger(o)) {
+                return 1;
+            } else {
+                return 2;
+            }
+        } else if (typeof o == 'boolean') {
+            return 3;
+        } else {
+            return 4;
+        }
+    } else {
+        if (Object.prototype.toString.call(o) == '[object Array]') {
+            // it's an array
+            return 5;
+        } else if (!o) {
+            // null 
+            return 0;
+        } else {
+            // it's an object
+            return 6;
+        }
+    }
+
+}
+function h$roundUpToMultipleOf(n,m) {
+  var rem = n % m;
+  return rem === 0 ? n : n - rem + m;
+}
+
+function h$newByteArray(len) {
+  var len0 = Math.max(h$roundUpToMultipleOf(len, 8), 8);
+  var buf = new ArrayBuffer(len0);
+  return { buf: buf
+         , len: len
+         , i3: new Int32Array(buf)
+         , u8: new Uint8Array(buf)
+         , u1: new Uint16Array(buf)
+         , f3: new Float32Array(buf)
+         , f6: new Float64Array(buf)
+         , dv: new DataView(buf)
+         }
+}
+function h$wrapBuffer(buf, unalignedOk, offset, length) {
+  if(!unalignedOk && offset && offset % 8 !== 0) {
+    throw ("h$wrapBuffer: offset not aligned:" + offset);
+  }
+  if(!buf || !(buf instanceof ArrayBuffer))
+    throw "h$wrapBuffer: not an ArrayBuffer"
+  if(!offset) { offset = 0; }
+  if(!length || length < 0) { length = buf.byteLength - offset; }
+  return { buf: buf
+         , len: length
+         , i3: (offset%4) ? null : new Int32Array(buf, offset, length >> 2)
+         , u8: new Uint8Array(buf, offset, length)
+         , u1: (offset%2) ? null : new Uint16Array(buf, offset, length >> 1)
+         , f3: (offset%4) ? null : new Float32Array(buf, offset, length >> 2)
+         , f6: (offset%8) ? null : new Float64Array(buf, offset, length >> 3)
+         , dv: new DataView(buf, offset, length)
+         };
+}
+function h$newByteArrayFromBase64String(base64) {
+  var bin = window.atob(base64);
+  var ba = h$newByteArray(bin.length);
+  var u8 = ba.u8;
+  for (var i = 0; i < bin.length; i++) {
+    u8[i] = bin.charCodeAt(i);
+  }
+  return ba;
+}
+function h$byteArrayToBase64String(off, len, ba) {
+  var bin = '';
+  var u8 = ba.u8;
+  var end = off + len;
+  for (var i = off; i < end; i++) {
+    bin += String.fromCharCode(u8[i]);
+  }
+  return window.btoa(bin);
+}
+function h$isNumber(o) {    return typeof(o) === 'number';
+}
+
+// returns true for null, but not for functions and host objects
+function h$isObject(o) {
+    return typeof(o) === 'object';
+}
+
+function h$isString(o) {
+    return typeof(o) === 'string';
+}
+
+function h$isSymbol(o) {
+    return typeof(o) === 'symbol';
+}
+
+function h$isBoolean(o) {
+    return typeof(o) === 'boolean';
+}
+
+function h$isFunction(o) {
+    return typeof(o) === 'function';
+}
+
+function h$jsTypeOf(o) {
+    var t = typeof(o);
+    if(t === 'undefined') return 0;
+    if(t === 'object')    return 1;
+    if(t === 'boolean')   return 2;
+    if(t === 'number')    return 3;
+    if(t === 'string')    return 4;
+    if(t === 'symbol')    return 5;
+    if(t === 'function')  return 6;
+    return 7; // other, host object etc
+}
+
+function h$jsonTypeOf(o) {
+    if (!(o instanceof Object)) {
+        if (o == null) {
+            return 0;
+        } else if (typeof o == 'number') {
+            if (h$isInteger(o)) {
+                return 1;
+            } else {
+                return 2;
+            }
+        } else if (typeof o == 'boolean') {
+            return 3;
+        } else {
+            return 4;
+        }
+    } else {
+        if (Object.prototype.toString.call(o) == '[object Array]') {
+            // it's an array
+            return 5;
+        } else if (!o) {
+            // null 
+            return 0;
+        } else {
+            // it's an object
+            return 6;
+        }
+    }
+
+}
+function h$roundUpToMultipleOf(n,m) {
+  var rem = n % m;
+  return rem === 0 ? n : n - rem + m;
+}
+
+function h$newByteArray(len) {
+  var len0 = Math.max(h$roundUpToMultipleOf(len, 8), 8);
+  var buf = new ArrayBuffer(len0);
+  return { buf: buf
+         , len: len
+         , i3: new Int32Array(buf)
+         , u8: new Uint8Array(buf)
+         , u1: new Uint16Array(buf)
+         , f3: new Float32Array(buf)
+         , f6: new Float64Array(buf)
+         , dv: new DataView(buf)
+         }
+}
+function h$wrapBuffer(buf, unalignedOk, offset, length) {
+  if(!unalignedOk && offset && offset % 8 !== 0) {
+    throw ("h$wrapBuffer: offset not aligned:" + offset);
+  }
+  if(!buf || !(buf instanceof ArrayBuffer))
+    throw "h$wrapBuffer: not an ArrayBuffer"
+  if(!offset) { offset = 0; }
+  if(!length || length < 0) { length = buf.byteLength - offset; }
+  return { buf: buf
+         , len: length
+         , i3: (offset%4) ? null : new Int32Array(buf, offset, length >> 2)
+         , u8: new Uint8Array(buf, offset, length)
+         , u1: (offset%2) ? null : new Uint16Array(buf, offset, length >> 1)
+         , f3: (offset%4) ? null : new Float32Array(buf, offset, length >> 2)
+         , f6: (offset%8) ? null : new Float64Array(buf, offset, length >> 3)
+         , dv: new DataView(buf, offset, length)
+         };
+}
+function h$newByteArrayFromBase64String(base64) {
+  var bin = window.atob(base64);
+  var ba = h$newByteArray(bin.length);
+  var u8 = ba.u8;
+  for (var i = 0; i < bin.length; i++) {
+    u8[i] = bin.charCodeAt(i);
+  }
+  return ba;
+}
+function h$byteArrayToBase64String(off, len, ba) {
+  var bin = '';
+  var u8 = ba.u8;
+  var end = off + len;
+  for (var i = off; i < end; i++) {
+    bin += String.fromCharCode(u8[i]);
+  }
+  return window.btoa(bin);
+}
+function h$isNumber(o) {    return typeof(o) === 'number';
+}
+
+// returns true for null, but not for functions and host objects
+function h$isObject(o) {
+    return typeof(o) === 'object';
+}
+
+function h$isString(o) {
+    return typeof(o) === 'string';
+}
+
+function h$isSymbol(o) {
+    return typeof(o) === 'symbol';
+}
+
+function h$isBoolean(o) {
+    return typeof(o) === 'boolean';
+}
+
+function h$isFunction(o) {
+    return typeof(o) === 'function';
+}
+
+function h$jsTypeOf(o) {
+    var t = typeof(o);
+    if(t === 'undefined') return 0;
+    if(t === 'object')    return 1;
+    if(t === 'boolean')   return 2;
+    if(t === 'number')    return 3;
+    if(t === 'string')    return 4;
+    if(t === 'symbol')    return 5;
+    if(t === 'function')  return 6;
+    return 7; // other, host object etc
+}
+
+function h$jsonTypeOf(o) {
+    if (!(o instanceof Object)) {
+        if (o == null) {
+            return 0;
+        } else if (typeof o == 'number') {
+            if (h$isInteger(o)) {
+                return 1;
+            } else {
+                return 2;
+            }
+        } else if (typeof o == 'boolean') {
+            return 3;
+        } else {
+            return 4;
+        }
+    } else {
+        if (Object.prototype.toString.call(o) == '[object Array]') {
+            // it's an array
+            return 5;
+        } else if (!o) {
+            // null 
+            return 0;
+        } else {
+            // it's an object
+            return 6;
+        }
+    }
+
+}
+function h$roundUpToMultipleOf(n,m) {
+  var rem = n % m;
+  return rem === 0 ? n : n - rem + m;
+}
+
+function h$newByteArray(len) {
+  var len0 = Math.max(h$roundUpToMultipleOf(len, 8), 8);
+  var buf = new ArrayBuffer(len0);
+  return { buf: buf
+         , len: len
+         , i3: new Int32Array(buf)
+         , u8: new Uint8Array(buf)
+         , u1: new Uint16Array(buf)
+         , f3: new Float32Array(buf)
+         , f6: new Float64Array(buf)
+         , dv: new DataView(buf)
+         }
+}
+function h$wrapBuffer(buf, unalignedOk, offset, length) {
+  if(!unalignedOk && offset && offset % 8 !== 0) {
+    throw ("h$wrapBuffer: offset not aligned:" + offset);
+  }
+  if(!buf || !(buf instanceof ArrayBuffer))
+    throw "h$wrapBuffer: not an ArrayBuffer"
+  if(!offset) { offset = 0; }
+  if(!length || length < 0) { length = buf.byteLength - offset; }
+  return { buf: buf
+         , len: length
+         , i3: (offset%4) ? null : new Int32Array(buf, offset, length >> 2)
+         , u8: new Uint8Array(buf, offset, length)
+         , u1: (offset%2) ? null : new Uint16Array(buf, offset, length >> 1)
+         , f3: (offset%4) ? null : new Float32Array(buf, offset, length >> 2)
+         , f6: (offset%8) ? null : new Float64Array(buf, offset, length >> 3)
+         , dv: new DataView(buf, offset, length)
+         };
+}
+function h$newByteArrayFromBase64String(base64) {
+  var bin = window.atob(base64);
+  var ba = h$newByteArray(bin.length);
+  var u8 = ba.u8;
+  for (var i = 0; i < bin.length; i++) {
+    u8[i] = bin.charCodeAt(i);
+  }
+  return ba;
+}
+function h$byteArrayToBase64String(off, len, ba) {
+  var bin = '';
+  var u8 = ba.u8;
+  var end = off + len;
+  for (var i = off; i < end; i++) {
+    bin += String.fromCharCode(u8[i]);
+  }
+  return window.btoa(bin);
+}
+function h$isNumber(o) {    return typeof(o) === 'number';
+}
+
+// returns true for null, but not for functions and host objects
+function h$isObject(o) {
+    return typeof(o) === 'object';
+}
+
+function h$isString(o) {
+    return typeof(o) === 'string';
+}
+
+function h$isSymbol(o) {
+    return typeof(o) === 'symbol';
+}
+
+function h$isBoolean(o) {
+    return typeof(o) === 'boolean';
+}
+
+function h$isFunction(o) {
+    return typeof(o) === 'function';
+}
+
+function h$jsTypeOf(o) {
+    var t = typeof(o);
+    if(t === 'undefined') return 0;
+    if(t === 'object')    return 1;
+    if(t === 'boolean')   return 2;
+    if(t === 'number')    return 3;
+    if(t === 'string')    return 4;
+    if(t === 'symbol')    return 5;
+    if(t === 'function')  return 6;
+    return 7; // other, host object etc
+}
+
+function h$jsonTypeOf(o) {
+    if (!(o instanceof Object)) {
+        if (o == null) {
+            return 0;
+        } else if (typeof o == 'number') {
+            if (h$isInteger(o)) {
+                return 1;
+            } else {
+                return 2;
+            }
+        } else if (typeof o == 'boolean') {
+            return 3;
+        } else {
+            return 4;
+        }
+    } else {
+        if (Object.prototype.toString.call(o) == '[object Array]') {
+            // it's an array
+            return 5;
+        } else if (!o) {
+            // null 
+            return 0;
+        } else {
+            // it's an object
+            return 6;
+        }
+    }
+
+}
+function h$roundUpToMultipleOf(n,m) {
+  var rem = n % m;
+  return rem === 0 ? n : n - rem + m;
+}
+
+function h$newByteArray(len) {
+  var len0 = Math.max(h$roundUpToMultipleOf(len, 8), 8);
+  var buf = new ArrayBuffer(len0);
+  return { buf: buf
+         , len: len
+         , i3: new Int32Array(buf)
+         , u8: new Uint8Array(buf)
+         , u1: new Uint16Array(buf)
+         , f3: new Float32Array(buf)
+         , f6: new Float64Array(buf)
+         , dv: new DataView(buf)
+         }
+}
+function h$wrapBuffer(buf, unalignedOk, offset, length) {
+  if(!unalignedOk && offset && offset % 8 !== 0) {
+    throw ("h$wrapBuffer: offset not aligned:" + offset);
+  }
+  if(!buf || !(buf instanceof ArrayBuffer))
+    throw "h$wrapBuffer: not an ArrayBuffer"
+  if(!offset) { offset = 0; }
+  if(!length || length < 0) { length = buf.byteLength - offset; }
+  return { buf: buf
+         , len: length
+         , i3: (offset%4) ? null : new Int32Array(buf, offset, length >> 2)
+         , u8: new Uint8Array(buf, offset, length)
+         , u1: (offset%2) ? null : new Uint16Array(buf, offset, length >> 1)
+         , f3: (offset%4) ? null : new Float32Array(buf, offset, length >> 2)
+         , f6: (offset%8) ? null : new Float64Array(buf, offset, length >> 3)
+         , dv: new DataView(buf, offset, length)
+         };
+}
+function h$newByteArrayFromBase64String(base64) {
+  var bin = window.atob(base64);
+  var ba = h$newByteArray(bin.length);
+  var u8 = ba.u8;
+  for (var i = 0; i < bin.length; i++) {
+    u8[i] = bin.charCodeAt(i);
+  }
+  return ba;
+}
+function h$byteArrayToBase64String(off, len, ba) {
+  var bin = '';
+  var u8 = ba.u8;
+  var end = off + len;
+  for (var i = off; i < end; i++) {
+    bin += String.fromCharCode(u8[i]);
+  }
+  return window.btoa(bin);
+}
+|]
