@@ -310,9 +310,6 @@ ${block14}
   };
   runBatch(batch);
 |]
-
-  mconcat
-  [block1, block2, block3, block4, block5, block6, block7, block8, block9, block10, block11, block12, block13, block14, block15]
   where
     sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
     block4 = case sendSync of
