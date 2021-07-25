@@ -317,7 +317,7 @@ ${block14}
     block4 = case sendSync of
       Just s  -> [i|
                                         if(inCallback > 0) {
-                                          ${block2}
+                                          ${send sendArg}
                                         } else {
                                           runBatch(${s sendArg}, 1);
                                         }
