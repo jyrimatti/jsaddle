@@ -311,7 +311,9 @@ ${block14}
   runBatch(batch);
 |]
   where
+    sendArg :: ByteString
     sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
+    block4 :: ByteString
     block4 = case sendSync of
       Just s  -> [i|
                                         if(inCallback > 0) {
@@ -321,11 +323,15 @@ ${block14}
                                         }
 |]
       Nothing -> send sendArg
+    block6 :: ByteString
     block6 = send "{\"tag\": \"ProtocolError\", \"contents\": e.data}"
+    block8 :: ByteString
     block8 = send "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
+    block10 :: ByteString
     block10 = case sendSync of
       Just s  ->
-        let sArg = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
+        let sArg :: ByteString
+            sArg = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
         in  [i|
               lastResults = [batch[2], {"tag": "Success", "contents": [callbacksToFree, results]}];
               batch = ${s sArg};
@@ -333,14 +339,18 @@ ${block14}
               callbacksToFree = [];
 |]
       Nothing ->
-        let sendArg' = "{\"tag\": \"BatchResults\", \"contents\": [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}]}"
+        let sendArg' :: ByteString
+            sendArg' = "{\"tag\": \"BatchResults\", \"contents\": [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}]}"
         in  [i|
               ${send sendArg'}
               break;
 |]
+    block12 :: ByteString
     block12 = case sendSync of
       Just s  ->
-        let sArg1 = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
+        let sArg1 :: ByteString
+            sArg1 = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
+            sArg2 :: ByteString
             sArg2 = "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}"
         in  [i|
               if(batch[2] === expectedBatch - 1) {
@@ -352,11 +362,13 @@ ${block14}
               callbacksToFree = [];
 |]
       Nothing ->
-        let sendArg' = "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}"
+        let sendArg' :: ByteString
+            sendArg' = "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}"
         in  [i|
               ${send sendArg'}
               break;
 |]
+    block14 :: ByteString
     block14 = send "{\"tag\": \"BatchResults\", \"contents\": [batch[2], {\"tag\": \"Failure\", \"contents\": [callbacksToFree, results, n, String(err)]}]}"
 
 ghcjsHelpers :: ByteString
