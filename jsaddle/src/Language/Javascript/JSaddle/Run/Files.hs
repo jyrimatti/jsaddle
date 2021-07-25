@@ -311,19 +311,18 @@ ${block14}
   runBatch(batch);
 |]
   where
+    sendArg :: ByteString
+    sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
     block4 :: ByteString
-    block4 =
-      let sendArg :: ByteString
-          sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
-      in  case sendSync of
-            Just s  -> [i|
+    block4 = case sendSync of
+      Just s  -> [i|
                                         if(inCallback > 0) {
                                           ${send sendArg}
                                         } else {
                                           runBatch(${s sendArg}, 1);
                                         }
 |]
-            Nothing -> send sendArg
+      Nothing -> send sendArg
     block6 :: ByteString
     block6 = send "{\"tag\": \"ProtocolError\", \"contents\": e.data}"
     block8 :: ByteString
