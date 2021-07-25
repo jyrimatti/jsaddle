@@ -54,10 +54,7 @@ initState = [here|
 |]
 
 runBatch :: (ByteString -> ByteString) -> Maybe (ByteString -> ByteString) -> ByteString
-runBatch send sendSync = mconcat
-  [block1, block2, block3, block4, block5, block6, block7, block8, block9, block10, block11, block12, block13, block14, block15]
-  where
-    block1 = [here|
+runBatch send sendSync = [i|
   var runBatch = function(firstBatch, initialSyncDepth) {
     var processBatch = function(timestamp) {
       var batch = firstBatch;
@@ -134,10 +131,7 @@ runBatch send sendSync = mconcat
                                             jsaddle_values.set(nArg, arguments[i]);
                                             args[i] = nArg;
                                         }
-|]
-    sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
-    block2 = send sendArg <> "\n"
-    block3 = [here|
+${send sendArg}
                                     };
                                     jsaddle_values.set(nFunction, func);
                                 })();
@@ -156,16 +150,7 @@ runBatch send sendSync = mconcat
                                             jsaddle_values.set(nArg, arguments[i]);
                                             args[i] = nArg;
                                         }
-|]
-    block4 = case sendSync of
-      Just s  ->
-        "                                        if(inCallback > 0) {\n\
-        \                                          " <> block2 <> "\
-        \                                        } else {\n\
-        \                                          runBatch(" <> s sendArg <> ", 1);\n\
-        \                                        }\n"
-      Nothing -> block2
-    block5 = [here|
+${block4}
                                     };
                                     jsaddle_values.set(nFunction, func);
                                     })();
@@ -224,9 +209,7 @@ runBatch send sendSync = mconcat
                                 syncDepth--;
                                 break;
                             default:
-|]
-    block6 = send "{\"tag\": \"ProtocolError\", \"contents\": e.data}" <> "\n"
-    block7 = [here|
+${block6}
                                 return;
                     }
                 } else {
@@ -289,41 +272,16 @@ runBatch send sendSync = mconcat
             }
             if(syncDepth <= 0) {
               lastResults = [batch[2], {"tag": "Success", "contents": [callbacksToFree, results]}];
-|]
-    block8 = send "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> "\n"
-    block9 = [here|
+${block8}
               break;
             } else {
-|]
-    block10 = case sendSync of
-      Just s  ->
-        "              lastResults = [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}];\n\
-        \              batch = " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ";\n\
-        \              results = [];\n\
-        \              callbacksToFree = [];\n"
-      Nothing ->
-        "              " <> send "{\"tag\": \"BatchResults\", \"contents\": [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}]}" <> "\n\
-        \              break;\n"
-    block11 = [here|
+${block10}
             }
           } else {
             if(syncDepth <= 0) {
               break;
             } else {
-|]
-    block12 = case sendSync of
-      Just s  ->
-        "              if(batch[2] === expectedBatch - 1) {\n\
-        \                batch = " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ";\n\
-        \              } else {\n\
-        \                batch = " <> s "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}" <> ";\n\
-        \              }\n\
-        \              results = [];\n\
-        \              callbacksToFree = [];\n"
-      Nothing ->
-        "              " <> send "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}" <> "\n\
-        \              break;\n"
-    block13 = [here|
+${block12}
             }
           }
         }
@@ -332,9 +290,7 @@ runBatch send sendSync = mconcat
         var n = ++jsaddle_index;
         jsaddle_values.set(n, err);
         console.log(err);
-|]
-    block14 = send "{\"tag\": \"BatchResults\", \"contents\": [batch[2], {\"tag\": \"Failure\", \"contents\": [callbacksToFree, results, n, String(err)]}]}" <> "\n"
-    block15 = [here|
+${block14}
       }
       if(inCallback == 1) {
           while(asyncBatch !== null) {
@@ -354,6 +310,57 @@ runBatch send sendSync = mconcat
   };
   runBatch(batch);
 |]
+
+  mconcat
+  [block1, block2, block3, block4, block5, block6, block7, block8, block9, block10, block11, block12, block13, block14, block15]
+  where
+    sendArg = "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}"
+    block4 = case sendSync of
+      Just s  -> [i|
+                                        if(inCallback > 0) {
+                                          ${block2}
+                                        } else {
+                                          runBatch(${s sendArg}, 1);
+                                        }
+|]
+      Nothing -> send sendArg
+    block6 = send "{\"tag\": \"ProtocolError\", \"contents\": e.data}"
+    block8 = send "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
+    block10 = case sendSync of
+      Just s  ->
+        let sArg = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
+        in  [i|
+              lastResults = [batch[2], {"tag": "Success", "contents": [callbacksToFree, results]}];
+              batch = ${s sArg};
+              results = [];
+              callbacksToFree = [];
+|]
+      Nothing ->
+        let sendArg' = "{\"tag\": \"BatchResults\", \"contents\": [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}]}"
+        in  [i|
+              ${send sendArg'}
+              break;
+|]
+    block12 = case sendSync of
+      Just s  ->
+        let sArg1 = "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}"
+            sArg2 = "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}"
+        in  [i|
+              if(batch[2] === expectedBatch - 1) {
+                batch = ${s sArg1};
+              } else {
+                batch = ${s sArg2};
+              }
+              results = [];
+              callbacksToFree = [];
+|]
+      Nothing ->
+        let sendArg' = "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}"
+        in  [i|
+              ${send sendArg'}
+              break;
+|]
+    block14 = send "{\"tag\": \"BatchResults\", \"contents\": [batch[2], {\"tag\": \"Failure\", \"contents\": [callbacksToFree, results, n, String(err)]}]}"
 
 ghcjsHelpers :: ByteString
 ghcjsHelpers = [here|
