@@ -22,7 +22,7 @@ module Language.Javascript.JSaddle.Run.Files (
 
 import Data.ByteString.Lazy (ByteString)
 import Data.Monoid ((<>))
-import Text.Heredoc (here)
+import Data.String.Here (i, here)
 
 indexHtml :: ByteString
 indexHtml = [here|
