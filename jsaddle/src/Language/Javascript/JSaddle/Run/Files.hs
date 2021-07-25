@@ -341,7 +341,7 @@ runBatch send sendSync = "\
     \"
 
 ghcjsHelpers :: ByteString
-ghcjsHelpers = [|here
+ghcjsHelpers = [here|
 function h$isNumber(o) {    return typeof(o) === 'number';
 }
 
