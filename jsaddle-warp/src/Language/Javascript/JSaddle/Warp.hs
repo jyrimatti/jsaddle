@@ -30,6 +30,7 @@ import Language.Javascript.JSaddle.Types (JSM)
 import Language.Javascript.JSaddle.Run (syncPoint)
 import Language.Javascript.JSaddle.WebSockets
 #endif
+import Data.ByteString.Lazy (ByteString)
 
 -- | Run the given 'JSM' action as the main entry point.  Either directly
 --   in GHCJS or as a Warp server on the given port on GHC.
@@ -41,4 +42,16 @@ run :: Int -> JSM () -> IO ()
 run port f =
     runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
         jsaddleOr defaultConnectionOptions (f >> syncPoint) jsaddleApp
+#endif
+
+-- | Run the given 'JSM' action as the main entry point.  Either directly
+--   in GHCJS or as a Warp server on the given port on GHC.
+#ifdef ghcjs_HOST_OS
+runWithIndex :: ByteString -> Int -> IO () -> IO ()
+runWithIndex _idx _port = id
+#else
+runWithIndex :: ByteString -> Int -> JSM () -> IO ()
+run idx port f =
+    runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
+        jsaddleOrWithIndex idx defaultConnectionOptions (f >> syncPoint) jsaddleApp
 #endif
