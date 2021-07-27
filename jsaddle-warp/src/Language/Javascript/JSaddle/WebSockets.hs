@@ -17,15 +17,20 @@
 module Language.Javascript.JSaddle.WebSockets (
   -- * Running JSM over WebSockets
     jsaddleOr
+  , jsaddleOrWithIndex
   , jsaddleApp
   , jsaddleWithAppOr
   , jsaddleAppWithJs
+  , jsaddleAppWithJsAndIndex
   , jsaddleAppWithJsOr
+  , jsaddleAppWithJsAndIndexOr
   , jsaddleAppPartial
   , jsaddleJs
   , jsaddleJs'
   , debug
+  , debugWithIndex
   , debugOr
+  , debugWithIndexOr
   , debugWrapper
 ) where
 

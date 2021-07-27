@@ -15,7 +15,7 @@
 
 module Language.Javascript.JSaddle.Warp (
   -- * Running JSM over WebSockets
-    run
+    run, runWithIndex
 #ifndef ghcjs_HOST_OS
   , module Language.Javascript.JSaddle.WebSockets
 #endif
