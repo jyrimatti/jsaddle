@@ -51,7 +51,7 @@ runWithIndex :: ByteString -> Int -> IO () -> IO ()
 runWithIndex _idx _port = id
 #else
 runWithIndex :: ByteString -> Int -> JSM () -> IO ()
-run idx port f =
+runWithIndex idx port f =
     runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
         jsaddleOrWithIndex idx defaultConnectionOptions (f >> syncPoint) jsaddleApp
 #endif
