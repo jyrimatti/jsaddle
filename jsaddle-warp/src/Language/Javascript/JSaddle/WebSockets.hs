@@ -17,7 +17,7 @@
 module Language.Javascript.JSaddle.WebSockets (
   -- * Running JSM over WebSockets
     jsaddleOr
-  , jsaddleOrWithIndex
+  , jsaddleWithIndexOr
   , jsaddleApp
   , jsaddleWithAppOr
   , jsaddleAppWithJs
