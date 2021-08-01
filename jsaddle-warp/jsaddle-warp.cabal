@@ -28,7 +28,6 @@ library
             Language.Javascript.JSaddle.WebSockets.Compat
         build-depends:
             aeson >=0.8.0.2 && <1.6,
-            bytestring >=0.10.6.0 && <0.11,
             containers >=0.5.6.2 && <0.7,
             foreign-store >=0.2 && <0.3,
             http-types >=0.8.6 && <0.13,
@@ -44,7 +43,8 @@ library
     exposed-modules:
         Language.Javascript.JSaddle.Warp
     build-depends:
-        base <5
+        base <5,
+        bytestring >=0.10.6.0 && <0.11
     default-language: Haskell2010
     hs-source-dirs: src
     ghc-options: -ferror-spans -Wall
