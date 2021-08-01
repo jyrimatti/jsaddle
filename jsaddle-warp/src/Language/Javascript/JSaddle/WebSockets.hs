@@ -17,15 +17,20 @@
 module Language.Javascript.JSaddle.WebSockets (
   -- * Running JSM over WebSockets
     jsaddleOr
+  , jsaddleOrWithIndex
   , jsaddleApp
   , jsaddleWithAppOr
   , jsaddleAppWithJs
+  , jsaddleAppWithJsAndIndex
   , jsaddleAppWithJsOr
+  , jsaddleAppWithJsAndIndexOr
   , jsaddleAppPartial
   , jsaddleJs
   , jsaddleJs'
   , debug
+  , debugWithIndex
   , debugOr
+  , debugWithIndexOr
   , debugWrapper
 ) where
 
@@ -74,8 +79,8 @@ import Control.Monad.IO.Class (MonadIO(..))
 import Language.Javascript.JSaddle.WebSockets.Compat (getTextMessageByteString)
 import qualified Data.Text.Encoding as T (decodeUtf8)
 
-jsaddleOr :: ConnectionOptions -> JSM () -> Application -> IO Application
-jsaddleOr opts entryPoint otherApp = do
+jsaddleWithIndexOr :: ByteString -> ConnectionOptions -> JSM () -> Application -> IO Application
+jsaddleWithIndexOr idx opts entryPoint otherApp = do
     syncHandlers <- newIORef M.empty
     asyncHandlers <- newIORef M.empty
     let wsApp :: ServerApp
@@ -133,10 +138,12 @@ jsaddleOr opts entryPoint otherApp = do
             (method, _) -> (catch404 otherApp) req sendResponse
               where catch404 = W.modifyResponse $ \resp ->
                       case (method, W.responseStatus resp) of
-                        ("GET", Status 404 _) -> indexResponse
+                        ("GET", Status 404 _) -> W.responseLBS H.status200 [("Content-Type", "text/html")] idx
                         _ -> resp
     return $ websocketsOr opts wsApp syncHandler
 
+jsaddleOr :: ConnectionOptions -> JSM () -> Application -> IO Application
+jsaddleOr = jsaddleWithIndexOr indexHtml
 
 jsaddleApp :: Application
 jsaddleApp = jsaddleAppWithJs $ jsaddleJs False
@@ -147,10 +154,21 @@ jsaddleAppWithJs js req sendResponse =
     (\_ _ -> sendResponse $ W.responseLBS H.status403 [("Content-Type", "text/plain")] "Forbidden")
     req sendResponse
 
+jsaddleAppWithJsAndIndex :: ByteString -> ByteString -> Application
+jsaddleAppWithJsAndIndex idx js req sendResponse =
+  jsaddleAppWithJsAndIndexOr idx js
+    (\_ _ -> sendResponse $ W.responseLBS H.status403 [("Content-Type", "text/plain")] "Forbidden")
+    req sendResponse
+
 jsaddleAppWithJsOr :: ByteString -> Application -> Application
 jsaddleAppWithJsOr js otherApp req sendResponse =
   fromMaybe (otherApp req sendResponse)
     (jsaddleAppPartialWithJs js req sendResponse)
+
+jsaddleAppWithJsAndIndexOr :: ByteString -> ByteString -> Application -> Application
+jsaddleAppWithJsAndIndexOr idx js otherApp req sendResponse =
+  fromMaybe (otherApp req sendResponse)
+    (jsaddleAppPartialWithJsAndIndex idx js req sendResponse)
 
 jsaddleWithAppOr :: ConnectionOptions -> JSM () -> Application -> IO Application
 jsaddleWithAppOr opts entryPoint otherApp = jsaddleOr opts entryPoint $ \req sendResponse ->
@@ -160,12 +178,12 @@ jsaddleWithAppOr opts entryPoint otherApp = jsaddleOr opts entryPoint $ \req sen
 jsaddleAppPartial :: Request -> (Response -> IO ResponseReceived) -> Maybe (IO ResponseReceived)
 jsaddleAppPartial = jsaddleAppPartialWithJs $ jsaddleJs False
 
-indexResponse :: Response
-indexResponse = W.responseLBS H.status200 [("Content-Type", "text/html")] indexHtml
-
 jsaddleAppPartialWithJs :: ByteString -> Request -> (Response -> IO ResponseReceived) -> Maybe (IO ResponseReceived)
-jsaddleAppPartialWithJs js req sendResponse = case (W.requestMethod req, W.pathInfo req) of
-    ("GET", []) -> Just $ sendResponse indexResponse
+jsaddleAppPartialWithJs = jsaddleAppPartialWithJsAndIndex indexHtml
+
+jsaddleAppPartialWithJsAndIndex :: ByteString -> ByteString -> Request -> (Response -> IO ResponseReceived) -> Maybe (IO ResponseReceived)
+jsaddleAppPartialWithJsAndIndex idx js req sendResponse = case (W.requestMethod req, W.pathInfo req) of
+    ("GET", []) -> Just $ sendResponse $ W.responseLBS H.status200 [("Content-Type", "text/html")] idx
     ("GET", ["jsaddle.js"]) -> Just $ sendResponse $ W.responseLBS H.status200 [("Content-Type", "application/javascript")] js
     _ -> Nothing
 
@@ -225,13 +243,14 @@ jsaddleJs' jsaddleUri refreshOnLoad = "\
     \            }\n\
     \\n\
     \ " <> runBatch (\a -> "ws.send(JSON.stringify(" <> a <> "));")
---              (Just (\a -> "(function(){\n\
---                  \                       var xhr = new XMLHttpRequest();\n\
---                  \                       xhr.open('POST', '" <> fromMaybe "" jsaddleUri <> "/sync/'+syncKey, false);\n\
---                  \                       xhr.setRequestHeader(\"Content-type\", \"application/json\");\n\
---                  \                       xhr.send(JSON.stringify(" <> a <> "));\n\
---                  \                       return JSON.parse(xhr.response);})()")) <> "\
-              Nothing <> "\
+              Nothing
+              -- (Just (\a -> "(function(){\n\
+              --     \                       var xhr = new XMLHttpRequest();\n\
+              --     \                       xhr.open('POST', '" <> fromMaybe "" jsaddleUri <> "/sync/'+syncKey, false);\n\
+              --     \                       xhr.setRequestHeader(\"Content-type\", \"application/json\");\n\
+              --     \                       xhr.send(JSON.stringify(" <> a <> "));\n\
+              --     \                       return JSON.parse(xhr.response);})()")) <> "\
+             <> "\
     \        };\n\
     \    };\n\
     \    ws0.onerror = function() {\n\
@@ -253,11 +272,25 @@ debug port f = do
             jsaddleOr defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJs $ jsaddleJs True)
     putStrLn $ "<a href=\"http://localhost:" <> show port <> "\">run</a>"
 
+debugWithIndex :: ByteString -> Int -> JSM () -> IO ()
+debugWithIndex idx port f = do
+    debugWrapper $ \withRefresh registerContext ->
+        runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
+            jsaddleOrWithIndex idx defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJsAndIndex idx $ jsaddleJs True)
+    putStrLn $ "<a href=\"http://localhost:" <> show port <> "\">run</a>"
+
 debugOr :: Int -> JSM () -> Application -> IO ()
 debugOr port f b = do
     debugWrapper $ \withRefresh registerContext ->
         runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
             jsaddleOr defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJsOr (jsaddleJs True) b)
+    putStrLn $ "<a href=\"http://localhost:" <> show port <> "\">run</a>"
+
+debugWithIndexOr :: ByteString -> Int -> JSM () -> Application -> IO ()
+debugWithIndexOr idx port f b = do
+    debugWrapper $ \withRefresh registerContext ->
+        runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
+            jsaddleOrWithIndex idx defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJsAndIndexOr idx (jsaddleJs True) b)
     putStrLn $ "<a href=\"http://localhost:" <> show port <> "\">run</a>"
 
 refreshMiddleware :: ((Response -> IO ResponseReceived) -> IO ResponseReceived) -> Middleware
