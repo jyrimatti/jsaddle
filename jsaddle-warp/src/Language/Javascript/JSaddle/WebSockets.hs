@@ -276,7 +276,7 @@ debugWithIndex :: ByteString -> Int -> JSM () -> IO ()
 debugWithIndex idx port f = do
     debugWrapper $ \withRefresh registerContext ->
         runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
-            jsaddleOrWithIndex idx defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJsAndIndex idx $ jsaddleJs True)
+            jsaddleWithIndexOr idx defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJsAndIndex idx $ jsaddleJs True)
     putStrLn $ "<a href=\"http://localhost:" <> show port <> "\">run</a>"
 
 debugOr :: Int -> JSM () -> Application -> IO ()
@@ -290,7 +290,7 @@ debugWithIndexOr :: ByteString -> Int -> JSM () -> Application -> IO ()
 debugWithIndexOr idx port f b = do
     debugWrapper $ \withRefresh registerContext ->
         runSettings (setPort port (setTimeout 3600 defaultSettings)) =<<
-            jsaddleOrWithIndex idx defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJsAndIndexOr idx (jsaddleJs True) b)
+            jsaddleWithIndexOr idx defaultConnectionOptions (registerContext >> f >> syncPoint) (withRefresh $ jsaddleAppWithJsAndIndexOr idx (jsaddleJs True) b)
     putStrLn $ "<a href=\"http://localhost:" <> show port <> "\">run</a>"
 
 refreshMiddleware :: ((Response -> IO ResponseReceived) -> IO ResponseReceived) -> Middleware
