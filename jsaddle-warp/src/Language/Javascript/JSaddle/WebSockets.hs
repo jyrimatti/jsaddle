@@ -243,14 +243,12 @@ jsaddleJs' jsaddleUri refreshOnLoad = "\
     \            }\n\
     \\n\
     \ " <> runBatch (\a -> "ws.send(JSON.stringify(" <> a <> "));")
-              Nothing
-              -- (Just (\a -> "(function(){\n\
-              --     \                       var xhr = new XMLHttpRequest();\n\
-              --     \                       xhr.open('POST', '" <> fromMaybe "" jsaddleUri <> "/sync/'+syncKey, false);\n\
-              --     \                       xhr.setRequestHeader(\"Content-type\", \"application/json\");\n\
-              --     \                       xhr.send(JSON.stringify(" <> a <> "));\n\
-              --     \                       return JSON.parse(xhr.response);})()")) <> "\
-             <> "\
+              (Just (\a -> "(function(){\n\
+                  \                       var xhr = new XMLHttpRequest();\n\
+                  \                       xhr.open('POST', '" <> fromMaybe "" jsaddleUri <> "/sync/'+syncKey, false);\n\
+                  \                       xhr.setRequestHeader(\"Content-type\", \"application/json\");\n\
+                  \                       xhr.send(JSON.stringify(" <> a <> "));\n\
+                  \                       return JSON.parse(xhr.response);})()")) <> "\
     \        };\n\
     \    };\n\
     \    ws0.onerror = function() {\n\
