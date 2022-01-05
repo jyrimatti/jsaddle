@@ -148,7 +148,7 @@ runBatch send sendSync = "\
     \                                        }\n" <> (
     case sendSync of
       Just s  ->
-        "                                        if(inCallback < -99999) {\n\
+        "                                        if(inCallback > 1) {\n\
         \                                          " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n\
         \                                        } else {\n\
         \                                          runBatch(" <> s "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> ", 1);\n\
