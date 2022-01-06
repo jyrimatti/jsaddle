@@ -148,10 +148,17 @@ runBatch send sendSync = "\
     \                                        }\n" <> (
     case sendSync of
       Just s  ->
-        "                                        if(inCallback > 0) {\n\
+        "                                        if(inCallback > 50) {\n\
+        \                                          throw 'Callback limit exceeded. Should this happen?'\n\   
         \                                          " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n\
         \                                        } else {\n\
-        \                                          runBatch(" <> s "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> ", syncDepth + 1);\n\
+        \                                          var modifyBatch = function(_batch) {\n\
+        \                                            _batch[0] = _batch[0].slice(nCommand+1);\n\
+        \                                            return _batch;\n\
+        \                                          };\n\
+        \                                          expectedBatch--;\n\
+        \                                          runBatch(modifyBatch(" <> s "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "), syncDepth + 1);\n\
+        \                                          expectedBatch++;\n\
         \                                        }\n"
       Nothing ->
         "                                        " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n"
@@ -283,6 +290,7 @@ runBatch send sendSync = "\
     case sendSync of
       Just s  ->
         "              lastResults = [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}];\n\
+        \              ws.send(JSON.stringify({\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}));\n\
         \              batch = " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ";\n\
         \              results = [];\n\
         \              callbacksToFree = [];\n"
@@ -299,6 +307,7 @@ runBatch send sendSync = "\
       Just s  ->
         "              if(batch[2] === expectedBatch - 1) {\n\
         \                batch = " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ";\n\
+        \                expectedBatch = batch[2];\n\
         \              } else {\n\
         \                batch = " <> s "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}" <> ";\n\
         \              }\n\
