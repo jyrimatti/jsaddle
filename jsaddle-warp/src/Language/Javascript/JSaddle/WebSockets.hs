@@ -244,6 +244,7 @@ jsaddleJs' jsaddleUri refreshOnLoad = "\
     \\n\
     \ " <> runBatch (\a -> "ws.send(JSON.stringify(" <> a <> "));")
               (Just (\a -> "(function(){\n\
+                  \                       lastResults = [lastResults[0], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}];\n\
                   \                       var xhr = new XMLHttpRequest();\n\
                   \                       xhr.open('POST', '" <> fromMaybe "" jsaddleUri <> "/sync/'+syncKey, false);\n\
                   \                       xhr.setRequestHeader(\"Content-type\", \"application/json\");\n\
