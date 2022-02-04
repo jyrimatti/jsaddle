@@ -157,6 +157,7 @@ runBatch send sendSync = "\
         \                                            return _batch;\n\
         \                                          };\n\
         \                                          expectedBatch--;\n\
+        \                                          lastResults = [lastResults[0], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}];\n\
         \                                          runBatch(modifyBatch(" <> s "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "), syncDepth + 1);\n\
         \                                          expectedBatch++;\n\
         \                                        }\n"
