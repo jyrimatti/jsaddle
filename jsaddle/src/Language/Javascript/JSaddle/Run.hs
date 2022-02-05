@@ -222,7 +222,7 @@ runJavaScript sendBatch entryPoint = do
                 takeResult recvMVar nBatch >>= \case
                     (n, _) | n /= nBatch -> error $ "Unexpected jsaddle results (expected batch " <> show nBatch <> ", got batch " <> show n <> ")"
                     (_, Success callbacksToFree results)
-                           | length results /= length resultMVars -> error "Unexpected number of jsaddle results"
+                           | length results /= length resultMVars -> error $ "Unexpected number of jsaddle results for batch " <> show nBatch <> ". Got " <> show (length results) <> " but expected " <> show (length resultMVars)
                            | otherwise -> do
                         zipWithM_ putMVar resultMVars results
                         forM_ callbacksToFree $ \(JSValueReceived val) ->
