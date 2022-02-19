@@ -160,7 +160,7 @@ runJavaScript sendBatch entryPoint = do
             contextId = contextId'
           , startTime = startTime'
           , doSendCommand = \cmd -> cmd `deepseq` do
-                atomicPutStrLn $ "doSendCommand " <> show cmd
+                --atomicPutStrLn $ "doSendCommand " <> show cmd
                 result <- newEmptyMVar
                 atomically $ writeTChan commandChan (Right (cmd, result))
                 unsafeInterleaveIO $
@@ -170,7 +170,7 @@ runJavaScript sendBatch entryPoint = do
                             throwIO $ JSException jsval
                         r -> return r
           , doSendAsyncCommand = \cmd -> cmd `deepseq` do
-              atomicPutStrLn $ "doSendAsyncCommand " <> show cmd
+              --atomicPutStrLn $ "doSendAsyncCommand " <> show cmd
               atomically (writeTChan commandChan $ Left cmd)
           , addCallback = \(Object (JSVal ioref)) cb -> do
                 val <- readIORef ioref
@@ -201,8 +201,8 @@ runJavaScript sendBatch entryPoint = do
                             doSendAsyncCommand ctx EndSyncBlock
             Duplicate nBatch nExpected -> do
                 logInfo (\_ -> "duplicate!")
-                atomicPutStrLn $ "Error : Unexpected Duplicate. syncCallbacks=" <> show syncCallbacks <>
-                    " nBatch=" <> show nBatch <> " nExpected=" <> show nExpected
+                --atomicPutStrLn $ "Error : Unexpected Duplicate. syncCallbacks=" <> show syncCallbacks <>
+                --    " nBatch=" <> show nBatch <> " nExpected=" <> show nExpected
                 void $ doSendCommand ctx Sync
             BatchResults n br -> do
                 logInfo (\_ -> "put batch in batchresults: " <> show n)
@@ -233,27 +233,27 @@ runJavaScript sendBatch entryPoint = do
                 r -> return r
         readBatch :: Int -> TChan (Either AsyncCommand (Command, MVar Result)) -> IO (Batch, [MVar Result])
         readBatch nBatch chan = do
-            atomicPutStrLn $ "readBatch: " <> show nBatch
+            --atomicPutStrLn $ "readBatch: " <> show nBatch
             first <- atomically $ readTChan chan -- We want at least one command to send
-            atomicPutStrLn $ "readBatch got first: " <> show nBatch
+            --atomicPutStrLn $ "readBatch got first: " <> show nBatch
             ret <- loop first ([], [])
-            atomicPutStrLn $ "readBatch returning: " <> show nBatch
+            --atomicPutStrLn $ "readBatch returning: " <> show nBatch
             pure ret
           where
             loop :: Either AsyncCommand (Command, MVar Result) -> ([Either AsyncCommand Command], [MVar Result]) -> IO (Batch, [MVar Result])
             loop (Left asyncCmd@(SyncWithAnimationFrame _)) (cmds, resultMVars) = do
-                atomicPutStrLn "loop 1"
+                --atomicPutStrLn "loop 1"
                 ret <- atomically (readTChan chan) >>= \cmd -> loopAnimation cmd (Left asyncCmd:cmds, resultMVars)
-                atomicPutStrLn "loop 1 returning"
+                --atomicPutStrLn "loop 1 returning"
                 pure ret
             loop (Right (syncCmd, resultMVar)) (cmds', resultMVars') = do
-                atomicPutStrLn "loop 2"
+                --atomicPutStrLn "loop 2"
                 let cmds = Right syncCmd:cmds'
                     resultMVars = resultMVar:resultMVars'
                 ret <- atomically (tryReadTChan chan) >>= \case
                     Nothing -> return (Batch (reverse cmds) False nBatch, reverse resultMVars)
                     Just cmd -> loop cmd (cmds, resultMVars)
-                atomicPutStrLn "loop 2 returning"
+                --atomicPutStrLn "loop 2 returning"
                 pure ret
             loop (Left asyncCmd) (cmds', resultMVars) = do
                 --atomicPutStrLn "loop 3"
@@ -270,19 +270,19 @@ runJavaScript sendBatch entryPoint = do
             -- When we have seen a SyncWithAnimationFrame command only a synchronous command should end the batch
             loopAnimation :: Either AsyncCommand (Command, MVar Result) -> ([Either AsyncCommand Command], [MVar Result]) -> IO (Batch, [MVar Result])
             loopAnimation (Right (Sync, resultMVar)) (cmds, resultMVars) = do
-                atomicPutStrLn "loopAnimation 1"
+                --atomicPutStrLn "loopAnimation 1"
                 ret <- return (Batch (reverse (Right Sync:cmds)) True nBatch, reverse (resultMVar:resultMVars))
-                atomicPutStrLn "loopAnimation 1 returning"
+                --atomicPutStrLn "loopAnimation 1 returning"
                 pure ret
             loopAnimation (Right (syncCmd, resultMVar)) (cmds, resultMVars) = do
-                atomicPutStrLn "loopAnimation 2"
+                --atomicPutStrLn "loopAnimation 2"
                 ret <- atomically (readTChan chan) >>= \cmd -> loopAnimation cmd (Right syncCmd:cmds, resultMVar:resultMVars)
-                atomicPutStrLn "loopAnimation 2 returning"
+                --atomicPutStrLn "loopAnimation 2 returning"
                 pure ret
             loopAnimation (Left asyncCmd) (cmds, resultMVars) = do
-                atomicPutStrLn "loopAnimation 3"
+                --atomicPutStrLn "loopAnimation 3"
                 ret <- atomically (readTChan chan) >>= \cmd -> loopAnimation cmd (Left asyncCmd:cmds, resultMVars)
-                atomicPutStrLn "loopAnimation 3 returning"
+                --atomicPutStrLn "loopAnimation 3 returning"
                 pure ret
     _ <- forkIO . numberForeverFromM_ 1 $ \nBatch -> flip catch (\BlockedIndefinitelyOnMVar -> atomicPutStrLn "ERROR MVar!") $ flip catch (\BlockedIndefinitelyOnSTM -> atomicPutStrLn "ERROR STM!") $ flip catch (\ThreadKilled -> atomicPutStrLn "ERROR Thread!") $ do
         logInfo (\_ -> "Batch: " <> show nBatch)
@@ -295,7 +295,7 @@ runJavaScript sendBatch entryPoint = do
                 sendBatch batch
                 takeResult recvMVar nBatch >>= \case
                     (n, _) | n /= nBatch -> do
-                        logInfo (\_ -> "Erroring1!!!")
+                        logInfo (\_ -> "Erroring!!!")
                         error $ "Unexpected jsaddle results (expected batch " <> show nBatch <> ", got batch " <> show n <> ")"
                     (_, Success callbacksToFree results)
                            | length results /= length resultMVars -> error $ "Unexpected number of jsaddle results for batch " <> show nBatch <> ". Got " <> show (length results) <> " but expected " <> show (length resultMVars)
