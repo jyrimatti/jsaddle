@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
+{-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
 
 module JavaScript.TypedArray.Internal where
 

@@ -4,6 +4,7 @@ module JavaScript.TypedArray.ArrayBuffer
     , freeze, unsafeFreeze
     , thaw, unsafeThaw
     , byteLengthIO
+    , create, sliceIO
     ) where
 
 import Control.Lens.Operators ((^.))

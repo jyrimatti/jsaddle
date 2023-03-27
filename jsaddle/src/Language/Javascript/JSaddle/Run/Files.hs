@@ -47,6 +47,9 @@ initState = "\
     \        var lastResults = [0, {\"tag\": \"Success\", \"contents\": [[], []]}];\n\
     \        var inCallback = 0;\n\
     \        var asyncBatch = null;\n\
+    \        var executed = {};\n\
+    \        var marker = undefined;\n\
+    \        var count = 0;\n\
     \"
 
 runBatch :: (ByteString -> ByteString) -> Maybe (ByteString -> ByteString) -> ByteString
@@ -62,228 +65,231 @@ runBatch send sendSync = "\
     \        for(;;){\n\
     \          if(batch[2] === expectedBatch) {\n\
     \            expectedBatch++;\n\
-    \            var nCommandsLength = batch[0].length;\n\
-    \            for (var nCommand = 0; nCommand != nCommandsLength; nCommand++) {\n\
-    \                var cmd = batch[0][nCommand];\n\
-    \                if (cmd.Left) {\n\
-    \                    var d = cmd.Left;\n\
-    \                    switch (d.tag) {\n\
-    \                            case \"FreeRef\":\n\
-    \                                var refsToFree = jsaddle_free.get(d.contents[0]) || [];\n\
-    \                                refsToFree.push(d.contents[1]);\n\
-    \                                jsaddle_free.set(d.contents[0], refsToFree);\n\
-    \                                break;\n\
-    \                            case \"FreeRefs\":\n\
-    \                                var refsToFree = jsaddle_free.get(d.contents) || [];\n\
-    \                                for(var nRef = 0; nRef != refsToFree.length; nRef++)\n\
-    \                                    jsaddle_values.delete(refsToFree[nRef]);\n\
-    \                                jsaddle_free.delete(d.contents);\n\
-    \                                break;\n\
-    \                            case \"SetPropertyByName\":\n\
-    \                                jsaddle_values.get(d.contents[0])[d.contents[1]]=jsaddle_values.get(d.contents[2]);\n\
-    \                                break;\n\
-    \                            case \"SetPropertyAtIndex\":\n\
-    \                                jsaddle_values.get(d.contents[0])[d.contents[1]]=jsaddle_values.get(d.contents[2]);\n\
-    \                                break;\n\
-    \                            case \"EvaluateScript\":\n\
-    \                                var n = d.contents[1];\n\
-    \                                jsaddle_values.set(n, eval(d.contents[0]));\n\
-    \                                break;\n\
-    \                            case \"StringToValue\":\n\
-    \                                var n = d.contents[1];\n\
-    \                                jsaddle_values.set(n, d.contents[0]);\n\
-    \                                break;\n\
-    \                            case \"JSONValueToValue\":\n\
-    \                                var n = d.contents[1];\n\
-    \                                jsaddle_values.set(n, d.contents[0]);\n\
-    \                                break;\n\
-    \                            case \"GetPropertyByName\":\n\
-    \                                var n = d.contents[2];\n\
-    \                                jsaddle_values.set(n, jsaddle_values.get(d.contents[0])[d.contents[1]]);\n\
-    \                                break;\n\
-    \                            case \"GetPropertyAtIndex\":\n\
-    \                                var n = d.contents[2];\n\
-    \                                jsaddle_values.set(n, jsaddle_values.get(d.contents[0])[d.contents[1]]);\n\
-    \                                break;\n\
-    \                            case \"NumberToValue\":\n\
-    \                                var n = d.contents[1];\n\
-    \                                jsaddle_values.set(n, d.contents[0]);\n\
-    \                                break;\n\
-    \                            case \"NewEmptyObject\":\n\
-    \                                var n = d.contents;\n\
-    \                                jsaddle_values.set(n, {});\n\
-    \                                break;\n\
-    \                            case \"NewAsyncCallback\":\n\
-    \                                (function() {\n\
-    \                                    var nFunction = d.contents;\n\
-    \                                    var func = function() {\n\
-    \                                        var nFunctionInFunc = ++jsaddle_index;\n\
-    \                                        jsaddle_values.set(nFunctionInFunc, func);\n\
-    \                                        var nThis = ++jsaddle_index;\n\
-    \                                        jsaddle_values.set(nThis, this);\n\
-    \                                        var args = [];\n\
-    \                                        for (var i = 0; i != arguments.length; i++) {\n\
-    \                                            var nArg = ++jsaddle_index;\n\
-    \                                            jsaddle_values.set(nArg, arguments[i]);\n\
-    \                                            args[i] = nArg;\n\
-    \                                        }\n\
-    \                                        " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n\
-    \                                    };\n\
-    \                                    jsaddle_values.set(nFunction, func);\n\
-    \                                })();\n\
-    \                                break;\n\
-    \                            case \"NewSyncCallback\":\n\
-    \                                (function() {\n\
-    \                                    var nFunction = d.contents;\n\
-    \                                    var func = function() {\n\
-    \                                        var nFunctionInFunc = ++jsaddle_index;\n\
-    \                                        jsaddle_values.set(nFunctionInFunc, func);\n\
-    \                                        var nThis = ++jsaddle_index;\n\
-    \                                        jsaddle_values.set(nThis, this);\n\
-    \                                        var args = [];\n\
-    \                                        for (var i = 0; i != arguments.length; i++) {\n\
-    \                                            var nArg = ++jsaddle_index;\n\
-    \                                            jsaddle_values.set(nArg, arguments[i]);\n\
-    \                                            args[i] = nArg;\n\
-    \                                        }\n" <> (
+    \            if (executed[batch[2]]) {\n\
+    \                // Batch already executed -> skipping\n\
+    \            } else {\n\
+    \                var nCommandsLength = batch[0].length;\n\
+    \                for (var nCommand = 0; nCommand != nCommandsLength; nCommand++) {\n\
+    \                    var cmd = batch[0][nCommand];\n\
+    \                    if (cmd.Left) {\n\
+    \                        var d = cmd.Left;\n\
+    \                        switch (d.tag) {\n\
+    \                                case \"FreeRef\":\n\
+    \                                    var refsToFree = jsaddle_free.get(d.contents[0]) || [];\n\
+    \                                    refsToFree.push(d.contents[1]);\n\
+    \                                    jsaddle_free.set(d.contents[0], refsToFree);\n\
+    \                                    break;\n\
+    \                                case \"FreeRefs\":\n\
+    \                                    var refsToFree = jsaddle_free.get(d.contents) || [];\n\
+    \                                    for(var nRef = 0; nRef != refsToFree.length; nRef++)\n\
+    \                                        jsaddle_values.delete(refsToFree[nRef]);\n\
+    \                                    jsaddle_free.delete(d.contents);\n\
+    \                                    break;\n\
+    \                                case \"SetPropertyByName\":\n\
+    \                                    jsaddle_values.get(d.contents[0])[d.contents[1]]=jsaddle_values.get(d.contents[2]);\n\
+    \                                    break;\n\
+    \                                case \"SetPropertyAtIndex\":\n\
+    \                                    jsaddle_values.get(d.contents[0])[d.contents[1]]=jsaddle_values.get(d.contents[2]);\n\
+    \                                    break;\n\
+    \                                case \"EvaluateScript\":\n\
+    \                                    var n = d.contents[1];\n\
+    \                                    jsaddle_values.set(n, eval(d.contents[0]));\n\
+    \                                    break;\n\
+    \                                case \"StringToValue\":\n\
+    \                                    var n = d.contents[1];\n\
+    \                                    jsaddle_values.set(n, d.contents[0]);\n\
+    \                                    break;\n\
+    \                                case \"JSONValueToValue\":\n\
+    \                                    var n = d.contents[1];\n\
+    \                                    jsaddle_values.set(n, d.contents[0]);\n\
+    \                                    break;\n\
+    \                                case \"GetPropertyByName\":\n\
+    \                                    var n = d.contents[2];\n\
+    \                                    jsaddle_values.set(n, jsaddle_values.get(d.contents[0])[d.contents[1]]);\n\
+    \                                    break;\n\
+    \                                case \"GetPropertyAtIndex\":\n\
+    \                                    var n = d.contents[2];\n\
+    \                                    jsaddle_values.set(n, jsaddle_values.get(d.contents[0])[d.contents[1]]);\n\
+    \                                    break;\n\
+    \                                case \"NumberToValue\":\n\
+    \                                    var n = d.contents[1];\n\
+    \                                    jsaddle_values.set(n, d.contents[0]);\n\
+    \                                    break;\n\
+    \                                case \"NewEmptyObject\":\n\
+    \                                    var n = d.contents;\n\
+    \                                    jsaddle_values.set(n, {});\n\
+    \                                    break;\n\
+    \                                case \"NewAsyncCallback\":\n\
+    \                                    (function() {\n\
+    \                                        var nFunction = d.contents;\n\
+    \                                        var func = function() {\n\
+    \                                            var nFunctionInFunc = ++jsaddle_index;\n\
+    \                                            jsaddle_values.set(nFunctionInFunc, func);\n\
+    \                                            var nThis = ++jsaddle_index;\n\
+    \                                            jsaddle_values.set(nThis, this);\n\
+    \                                            var args = [];\n\
+    \                                            for (var i = 0; i != arguments.length; i++) {\n\
+    \                                                var nArg = ++jsaddle_index;\n\
+    \                                                jsaddle_values.set(nArg, arguments[i]);\n\
+    \                                                args[i] = nArg;\n\
+    \                                            }\n\
+    \                                            " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n\
+    \                                        };\n\
+    \                                        jsaddle_values.set(nFunction, func);\n\
+    \                                    })();\n\
+    \                                    break;\n\
+    \                                case \"NewSyncCallback\":\n\
+    \                                    (function() {\n\
+    \                                        var nFunction = d.contents;\n\
+    \                                        var func = function() {\n\
+    \                                            var nFunctionInFunc = ++jsaddle_index;\n\
+    \                                            jsaddle_values.set(nFunctionInFunc, func);\n\
+    \                                            var nThis = ++jsaddle_index;\n\
+    \                                            jsaddle_values.set(nThis, this);\n\
+    \                                            var args = [];\n\
+    \                                            for (var i = 0; i != arguments.length; i++) {\n\
+    \                                                var nArg = ++jsaddle_index;\n\
+    \                                                jsaddle_values.set(nArg, arguments[i]);\n\
+    \                                                args[i] = nArg;\n\
+    \                                            }\n" <> (
     case sendSync of
       Just s  ->
-        "                                        if(inCallback > 50) {\n\
-        \                                          throw 'Callback limit exceeded. Should this happen?'\n\   
-        \                                          " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n\
-        \                                        } else {\n\
-        \                                          var modifyBatch = function(_batch) {\n\
-        \                                            _batch[0] = _batch[0].slice(nCommand+1);\n\
-        \                                            return _batch;\n\
-        \                                          };\n\
-        \                                          expectedBatch--;\n\
-        \                                          lastResults = [lastResults[0], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}];\n\
-        \                                          runBatch(modifyBatch(" <> s "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "), syncDepth + 1);\n\
-        \                                          expectedBatch++;\n\
-        \                                        }\n"
+        "                                            if(inCallback > 50) {\n\
+        \                                              throw 'Callback limit exceeded. Should this happen?'\n\   
+        \                                              " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n\
+        \                                            } else {\n\
+        \                                              runBatch(modifyBatch(batch, marker, " <> s "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "), syncDepth + 1);\n\
+        \                                            }\n"
       Nothing ->
-        "                                        " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n"
+        "                                            " <> send "{\"tag\": \"Callback\", \"contents\": [lastResults[0], lastResults[1], nFunction, nFunctionInFunc, nThis, args]}" <> "\n"
     ) <>
-    "                                    };\n\
-    \                                    jsaddle_values.set(nFunction, func);\n\
-    \                                })();\n\
-    \                                break;\n\
-    \                            case \"FreeCallback\":\n\
-    \                                callbacksToFree.push(d.contents);\n\
-    \                                break;\n\
-    \                            case \"CallAsFunction\":\n\
-    \                                var n = d.contents[3];\n\
-    \                                jsaddle_values.set(n,\n\
-    \                                    jsaddle_values.get(d.contents[0]).apply(jsaddle_values.get(d.contents[1]),\n\
-    \                                        d.contents[2].map(function(arg){return jsaddle_values.get(arg);})));\n\
-    \                                break;\n\
-    \                            case \"CallAsConstructor\":\n\
-    \                                var n = d.contents[2];\n\
-    \                                var r;\n\
-    \                                var f = jsaddle_values.get(d.contents[0]);\n\
-    \                                var a = d.contents[1].map(function(arg){return jsaddle_values.get(arg);});\n\
-    \                                switch(a.length) {\n\
-    \                                    case 0 : r = new f(); break;\n\
-    \                                    case 1 : r = new f(a[0]); break;\n\
-    \                                    case 2 : r = new f(a[0],a[1]); break;\n\
-    \                                    case 3 : r = new f(a[0],a[1],a[2]); break;\n\
-    \                                    case 4 : r = new f(a[0],a[1],a[2],a[3]); break;\n\
-    \                                    case 5 : r = new f(a[0],a[1],a[2],a[3],a[4]); break;\n\
-    \                                    case 6 : r = new f(a[0],a[1],a[2],a[3],a[4],a[5]); break;\n\
-    \                                    case 7 : r = new f(a[0],a[1],a[2],a[3],a[4],a[5],a[6]); break;\n\
-    \                                    default:\n\
-    \                                        var ret;\n\
-    \                                        var temp = function() {\n\
-    \                                            ret = f.apply(this, a);\n\
-    \                                        };\n\
-    \                                        temp.prototype = f.prototype;\n\
-    \                                        var i = new temp();\n\
-    \                                        if(ret instanceof Object)\n\
-    \                                            r = ret;\n\
-    \                                        else {\n\
-    \                                            i.constructor = f;\n\
-    \                                            r = i;\n\
-    \                                        }\n\
-    \                                }\n\
-    \                                jsaddle_values.set(n, r);\n\
-    \                                break;\n\
-    \                            case \"NewArray\":\n\
-    \                                var n = d.contents[1];\n\
-    \                                jsaddle_values.set(n, d.contents[0].map(function(v){return jsaddle_values.get(v);}));\n\
-    \                                break;\n\
-    \                            case \"SyncWithAnimationFrame\":\n\
-    \                                var n = d.contents;\n\
-    \                                jsaddle_values.set(n, timestamp);\n\
-    \                                break;\n\
-    \                            case \"StartSyncBlock\":\n\
-    \                                syncDepth++;\n\
-    \                                break;\n\
-    \                            case \"EndSyncBlock\":\n\
-    \                                syncDepth--;\n\
-    \                                break;\n\
-    \                            default:\n\
-    \                                " <> send "{\"tag\": \"ProtocolError\", \"contents\": e.data}" <> "\n\
-    \                                return;\n\
-    \                    }\n\
-    \                } else {\n\
-    \                    var d = cmd.Right;\n\
-    \                    switch (d.tag) {\n\
-    \                            case \"ValueToString\":\n\
-    \                                var val = jsaddle_values.get(d.contents);\n\
-    \                                var s = val === null ? \"null\" : val === undefined ? \"undefined\" : val.toString();\n\
-    \                                results.push({\"tag\": \"ValueToStringResult\", \"contents\": s});\n\
-    \                                break;\n\
-    \                            case \"ValueToBool\":\n\
-    \                                results.push({\"tag\": \"ValueToBoolResult\", \"contents\": jsaddle_values.get(d.contents) ? true : false});\n\
-    \                                break;\n\
-    \                            case \"ValueToNumber\":\n\
-    \                                results.push({\"tag\": \"ValueToNumberResult\", \"contents\": Number(jsaddle_values.get(d.contents))});\n\
-    \                                break;\n\
-    \                            case \"ValueToJSON\":\n\
-    \                                var s = jsaddle_values.get(d.contents) === undefined ? \"\" : JSON.stringify(jsaddle_values.get(d.contents));\n\
-    \                                results.push({\"tag\": \"ValueToJSONResult\", \"contents\": s});\n\
-    \                                break;\n\
-    \                            case \"ValueToJSONValue\":\n\
-    \                                results.push({\"tag\": \"ValueToJSONValueResult\", \"contents\": jsaddle_values.get(d.contents)});\n\
-    \                                break;\n\
-    \                            case \"DeRefVal\":\n\
-    \                                var n = d.contents;\n\
-    \                                var v = jsaddle_values.get(n);\n\
-    \                                var c = (v === null           ) ? [0, \"\"] :\n\
-    \                                        (v === undefined      ) ? [1, \"\"] :\n\
-    \                                        (v === false          ) ? [2, \"\"] :\n\
-    \                                        (v === true           ) ? [3, \"\"] :\n\
-    \                                        (typeof v === \"number\") ? [-1, v.toString()] :\n\
-    \                                        (typeof v === \"string\") ? [-2, v]\n\
-    \                                                                : [-3, \"\"];\n\
-    \                                results.push({\"tag\": \"DeRefValResult\", \"contents\": c});\n\
-    \                                break;\n\
-    \                            case \"IsNull\":\n\
-    \                                results.push({\"tag\": \"IsNullResult\", \"contents\": jsaddle_values.get(d.contents) === null});\n\
-    \                                break;\n\
-    \                            case \"IsUndefined\":\n\
-    \                                results.push({\"tag\": \"IsUndefinedResult\", \"contents\": jsaddle_values.get(d.contents) === undefined});\n\
-    \                                break;\n\
-    \                            case \"InstanceOf\":\n\
-    \                                results.push({\"tag\": \"InstanceOfResult\", \"contents\": jsaddle_values.get(d.contents[0]) instanceof jsaddle_values.get(d.contents[1])});\n\
-    \                                break;\n\
-    \                            case \"StrictEqual\":\n\
-    \                                results.push({\"tag\": \"StrictEqualResult\", \"contents\": jsaddle_values.get(d.contents[0]) === jsaddle_values.get(d.contents[1])});\n\
-    \                                break;\n\
-    \                            case \"PropertyNames\":\n\
-    \                                var result = [];\n\
-    \                                for (name in jsaddle_values.get(d.contents)) { result.push(name); }\n\
-    \                                results.push({\"tag\": \"PropertyNamesResult\", \"contents\": result});\n\
-    \                                break;\n\
-    \                            case \"Sync\":\n\
-    \                                results.push({\"tag\": \"SyncResult\", \"contents\": []});\n\
-    \                                break;\n\
-    \                            default:\n\
-    \                                results.push({\"tag\": \"ProtocolError\", \"contents\": e.data});\n\
+    "                                        };\n\
+    \                                        jsaddle_values.set(nFunction, func);\n\
+    \                                    })();\n\
+    \                                    break;\n\
+    \                                case \"FreeCallback\":\n\
+    \                                    callbacksToFree.push(d.contents);\n\
+    \                                    break;\n\
+    \                                case \"CallAsFunction\":\n\
+    \                                    marker = d;\
+    \                                    var n = d.contents[3];\n\
+    \                                    jsaddle_values.set(n,\n\
+    \                                        jsaddle_values.get(d.contents[0]).apply(jsaddle_values.get(d.contents[1]),\n\
+    \                                            d.contents[2].map(function(arg){return jsaddle_values.get(arg);})));\n\
+    \                                    marker = undefined;\
+    \                                    break;\n\
+    \                                case \"CallAsConstructor\":\n\
+    \                                    var n = d.contents[2];\n\
+    \                                    var r;\n\
+    \                                    var f = jsaddle_values.get(d.contents[0]);\n\
+    \                                    var a = d.contents[1].map(function(arg){return jsaddle_values.get(arg);});\n\
+    \                                    switch(a.length) {\n\
+    \                                        case 0 : r = new f(); break;\n\
+    \                                        case 1 : r = new f(a[0]); break;\n\
+    \                                        case 2 : r = new f(a[0],a[1]); break;\n\
+    \                                        case 3 : r = new f(a[0],a[1],a[2]); break;\n\
+    \                                        case 4 : r = new f(a[0],a[1],a[2],a[3]); break;\n\
+    \                                        case 5 : r = new f(a[0],a[1],a[2],a[3],a[4]); break;\n\
+    \                                        case 6 : r = new f(a[0],a[1],a[2],a[3],a[4],a[5]); break;\n\
+    \                                        case 7 : r = new f(a[0],a[1],a[2],a[3],a[4],a[5],a[6]); break;\n\
+    \                                        default:\n\
+    \                                            var ret;\n\
+    \                                            var temp = function() {\n\
+    \                                                ret = f.apply(this, a);\n\
+    \                                            };\n\
+    \                                            temp.prototype = f.prototype;\n\
+    \                                            var i = new temp();\n\
+    \                                            if(ret instanceof Object)\n\
+    \                                                r = ret;\n\
+    \                                            else {\n\
+    \                                                i.constructor = f;\n\
+    \                                                r = i;\n\
+    \                                            }\n\
+    \                                    }\n\
+    \                                    jsaddle_values.set(n, r);\n\
+    \                                    break;\n\
+    \                                case \"NewArray\":\n\
+    \                                    var n = d.contents[1];\n\
+    \                                    jsaddle_values.set(n, d.contents[0].map(function(v){return jsaddle_values.get(v);}));\n\
+    \                                    break;\n\
+    \                                case \"SyncWithAnimationFrame\":\n\
+    \                                    var n = d.contents;\n\
+    \                                    jsaddle_values.set(n, timestamp);\n\
+    \                                    break;\n\
+    \                                case \"StartSyncBlock\":\n\
+    \                                    syncDepth++;\n\
+    \                                    break;\n\
+    \                                case \"EndSyncBlock\":\n\
+    \                                    if (syncDepth > 0) {\n\
+    \                                        syncDepth--;\n\
+    \                                    }\n\
+    \                                    break;\n\
+    \                                default:\n\
+    \                                    " <> send "{\"tag\": \"ProtocolError\", \"contents\": e.data}" <> "\n\
+    \                                    return;\n\
     \                        }\n\
+    \                    } else {\n\
+    \                        var d = cmd.Right;\n\
+    \                        switch (d.tag) {\n\
+    \                                case \"ValueToString\":\n\
+    \                                    var val = jsaddle_values.get(d.contents);\n\
+    \                                    var s = val === null ? \"null\" : val === undefined ? \"undefined\" : val.toString();\n\
+    \                                    results.push({\"tag\": \"ValueToStringResult\", \"contents\": s});\n\
+    \                                    break;\n\
+    \                                case \"ValueToBool\":\n\
+    \                                    results.push({\"tag\": \"ValueToBoolResult\", \"contents\": jsaddle_values.get(d.contents) ? true : false});\n\
+    \                                    break;\n\
+    \                                case \"ValueToNumber\":\n\
+    \                                    results.push({\"tag\": \"ValueToNumberResult\", \"contents\": Number(jsaddle_values.get(d.contents))});\n\
+    \                                    break;\n\
+    \                                case \"ValueToJSON\":\n\
+    \                                    var s = jsaddle_values.get(d.contents) === undefined ? \"\" : JSON.stringify(jsaddle_values.get(d.contents));\n\
+    \                                    results.push({\"tag\": \"ValueToJSONResult\", \"contents\": s});\n\
+    \                                    break;\n\
+    \                                case \"ValueToJSONValue\":\n\
+    \                                    results.push({\"tag\": \"ValueToJSONValueResult\", \"contents\": jsaddle_values.get(d.contents)});\n\
+    \                                    break;\n\
+    \                                case \"DeRefVal\":\n\
+    \                                    var n = d.contents;\n\
+    \                                    var v = jsaddle_values.get(n);\n\
+    \                                    var c = (v === null           ) ? [0, \"\"] :\n\
+    \                                            (v === undefined      ) ? [1, \"\"] :\n\
+    \                                            (v === false          ) ? [2, \"\"] :\n\
+    \                                            (v === true           ) ? [3, \"\"] :\n\
+    \                                            (typeof v === \"number\") ? [-1, v.toString()] :\n\
+    \                                            (typeof v === \"string\") ? [-2, v]\n\
+    \                                                                    : [-3, \"\"];\n\
+    \                                    results.push({\"tag\": \"DeRefValResult\", \"contents\": c});\n\
+    \                                    break;\n\
+    \                                case \"IsNull\":\n\
+    \                                    results.push({\"tag\": \"IsNullResult\", \"contents\": jsaddle_values.get(d.contents) === null});\n\
+    \                                    break;\n\
+    \                                case \"IsUndefined\":\n\
+    \                                    results.push({\"tag\": \"IsUndefinedResult\", \"contents\": jsaddle_values.get(d.contents) === undefined});\n\
+    \                                    break;\n\
+    \                                case \"InstanceOf\":\n\
+    \                                    results.push({\"tag\": \"InstanceOfResult\", \"contents\": jsaddle_values.get(d.contents[0]) instanceof jsaddle_values.get(d.contents[1])});\n\
+    \                                    break;\n\
+    \                                case \"StrictEqual\":\n\
+    \                                    results.push({\"tag\": \"StrictEqualResult\", \"contents\": jsaddle_values.get(d.contents[0]) === jsaddle_values.get(d.contents[1])});\n\
+    \                                    break;\n\
+    \                                case \"PropertyNames\":\n\
+    \                                    var result = [];\n\
+    \                                    for (name in jsaddle_values.get(d.contents)) { result.push(name); }\n\
+    \                                    results.push({\"tag\": \"PropertyNamesResult\", \"contents\": result});\n\
+    \                                    break;\n\
+    \                                case \"Sync\":\n\
+    \                                    results.push({\"tag\": \"SyncResult\", \"contents\": []});\n\
+    \                                    break;\n\
+    \                                default:\n\
+    \                                    results.push({\"tag\": \"ProtocolError\", \"contents\": e.data});\n\
+    \                            }\n\
+    \                    }\n\
     \                }\n\
     \            }\n\
-    \            if(syncDepth <= 0) {\n\
+    \            executed[batch[2]] = true;\n\
+    \\n\
+    \            if(syncDepth <= 0 && inCallback <= 0) {\n\
     \              lastResults = [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}];\n\
     \              " <> send "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> "\n\
     \              break;\n\
@@ -292,7 +298,7 @@ runBatch send sendSync = "\
       Just s  ->
         "              lastResults = [batch[2], {\"tag\": \"Success\", \"contents\": [callbacksToFree, results]}];\n\
         \              ws.send(JSON.stringify({\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}));\n\
-        \              batch = " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ";\n\
+        \              batch = modifyBatch(batch, marker || (batch[0][batch[0].length-1] ? batch[0][batch[0].length-1].Left || batch[0][batch[0].length-1].Right : undefined), " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ");\n\
         \              results = [];\n\
         \              callbacksToFree = [];\n"
       Nothing ->
@@ -307,8 +313,20 @@ runBatch send sendSync = "\
     case sendSync of
       Just s  ->
         "              if(batch[2] === expectedBatch - 1) {\n\
-        \                batch = " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ";\n\
+        \                var originalBatch = batch;\n\
+        \                batch = modifyBatch(batch, marker || (batch[0][batch[0].length-1] ? batch[0][batch[0].length-1].Left || batch[0][batch[0].length-1].Right : undefined), " <> s "{\"tag\": \"BatchResults\", \"contents\": [lastResults[0], lastResults[1]]}" <> ");\n\
         \                expectedBatch = batch[2];\n\
+        \                if (batch[2] === originalBatch[2]) {\n\
+        \                  count++;\n\
+        \                  if (count > 500) {\n\
+        \                    count = 0;\n\
+        \                    // Got same batch 500 times -> breaking away'\n\
+        \                    batch[0] = [];\n\
+        \                    break;\n\
+        \                  }\n\
+        \                } else {\n\
+        \                  count = 0;\n\
+        \                }\n\
         \              } else {\n\
         \                batch = " <> s "{\"tag\": \"Duplicate\", \"contents\": [batch[2], expectedBatch]}" <> ";\n\
         \              }\n\

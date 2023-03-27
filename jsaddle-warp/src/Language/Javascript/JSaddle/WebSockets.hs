@@ -242,6 +242,18 @@ jsaddleJs' jsaddleUri refreshOnLoad = "\
     "                return;\n\
     \            }\n\
     \\n\
+    \            var modifyBatch = function(prevBatch, marker, _batch) {\n\
+    \            if (!marker && prevBatch[2] === _batch[2] && prevBatch[0].length == 0) {\n\
+    \                _batch[0] = [];\n\
+    \            } else if (marker && prevBatch[2] === _batch[2]) {\n\
+    \                var thisIndex = _batch[0].findIndex(x => x.Left && JSON.stringify(x.Left) === JSON.stringify(marker));\n\
+    \                if (thisIndex > -1) { \n\
+    \                    _batch[0] = _batch[0].slice(thisIndex+1);\n\
+    \                }\n\
+    \            }\n\
+    \            return _batch;\n\
+    \        };\n\
+    \\n\
     \ " <> runBatch (\a -> "ws.send(JSON.stringify(" <> a <> "));")
               (Just (\a -> "(function(){\n\
                   \                       var xhr = new XMLHttpRequest();\n\
